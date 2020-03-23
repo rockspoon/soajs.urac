@@ -15,9 +15,9 @@ module.exports = {
         "memory": ''
     },
     "serviceVersion": 3,
-    "serviceName": "urac",
+    "serviceName": "rsurac",
     "serviceGroup": "SOAJS Core Services",
-    "servicePort": 4001,
+    "servicePort": 4070,
     "requestTimeout": 30,
     "requestTimeoutRenewal": 5,
     "extKeyRequired": true,
@@ -64,7 +64,7 @@ module.exports = {
             "keywords": {
                 "source": ['query.keywords', 'body.keywords'],
                 "required": false,
-                "validation": {"type": "string"}
+                "validation": { "type": "string" }
             },
             "start": {
                 "required": false,
@@ -121,7 +121,7 @@ module.exports = {
                 "username": {
                     "source": ['query.username'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
             '/validate/join': {
@@ -132,7 +132,7 @@ module.exports = {
                 "token": {
                     "source": ['query.token'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
             '/checkUsername': {
@@ -143,7 +143,7 @@ module.exports = {
                 "username": {
                     "source": ['query.username'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
             '/validate/changeEmail': {
@@ -154,7 +154,7 @@ module.exports = {
                 "token": {
                     "source": ['query.token'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
             '/user': {
@@ -166,7 +166,7 @@ module.exports = {
                 "username": {
                     "source": ['query.username'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
 
@@ -178,7 +178,7 @@ module.exports = {
                 "id": {
                     "source": ['query.id'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
             '/admin/users': {
@@ -191,7 +191,7 @@ module.exports = {
                 "config": {
                     "source": ['query.config'],
                     "required": false,
-                    "validation": {"type": "boolean"}
+                    "validation": { "type": "boolean" }
                 }
             },
             '/admin/users/count': {
@@ -216,12 +216,12 @@ module.exports = {
                 "id": {
                     "source": ['query.id'],
                     "required": false,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "code": {
                     "source": ['query.code'],
                     "required": false,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
 
@@ -242,12 +242,12 @@ module.exports = {
                 "email": {
                     "source": ['body.email'],
                     "required": true,
-                    "validation": {"type": "string", "format": "email"}
+                    "validation": { "type": "string", "format": "email" }
                 },
                 "what": {
                     "source": ['body.what'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "data": {
                     "source": ['body.data'],
@@ -276,27 +276,27 @@ module.exports = {
                 "password": {
                     "source": ['body.password'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "firstName": {
                     "source": ['body.firstName'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "lastName": {
                     "source": ['body.lastName'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "email": {
                     "source": ['body.email'],
                     "required": true,
-                    "validation": {"type": "string", "format": "email"}
+                    "validation": { "type": "string", "format": "email" }
                 },
                 "profile": {
                     "source": ['body.profile'],
                     "required": false,
-                    "validation": {"type": "object"}
+                    "validation": { "type": "object" }
                 }
             },
 
@@ -318,22 +318,22 @@ module.exports = {
                 "firstName": {
                     "source": ['body.firstName'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "lastName": {
                     "source": ['body.lastName'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "email": {
                     "source": ['body.email'],
                     "required": true,
-                    "validation": {"type": "string", "format": "email"}
+                    "validation": { "type": "string", "format": "email" }
                 },
                 "profile": {
                     "source": ['body.profile'],
                     "required": false,
-                    "validation": {"type": "object"}
+                    "validation": { "type": "object" }
                 },
                 "groups": {
                     "source": ['body.groups'],
@@ -357,7 +357,7 @@ module.exports = {
                 "password": {
                     "source": ['body.password'],
                     "required": false,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "pin": {
                     "source": ['body.pin'],
@@ -400,7 +400,7 @@ module.exports = {
                 "config": {
                     "source": ['body.config'],
                     "required": false,
-                    "validation": {"type": "boolean"}
+                    "validation": { "type": "boolean" }
                 }
             },
 
@@ -421,12 +421,12 @@ module.exports = {
                 "name": {
                     "source": ['body.name'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "description": {
                     "source": ['body.description'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "packages": {
                     "source": ['body.packages'],
@@ -476,7 +476,7 @@ module.exports = {
                 "id": {
                     "source": ['query.id'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             }
         },
@@ -490,17 +490,17 @@ module.exports = {
                 "token": {
                     "source": ['body.token'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "password": {
                     "source": ['body.password'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "confirmation": {
                     "source": ['body.confirmation'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
 
@@ -512,22 +512,22 @@ module.exports = {
                 "id": {
                     "source": ['body.id'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "oldPassword": {
                     "source": ['body.oldPassword'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "password": {
                     "source": ['body.password'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "confirmation": {
                     "source": ['body.confirmation'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 }
             },
 
@@ -539,12 +539,12 @@ module.exports = {
                 "id": {
                     "source": ['body.id'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "email": {
                     "source": ['body.email'],
                     "required": true,
-                    "validation": {"type": "string", "format": "email"}
+                    "validation": { "type": "string", "format": "email" }
                 }
             },
 
@@ -556,7 +556,7 @@ module.exports = {
                 "id": {
                     "source": ['body.id'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "username": {
                     "source": ['body.username'],
@@ -569,17 +569,17 @@ module.exports = {
                 "firstName": {
                     "source": ['body.firstName'],
                     "required": false,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "lastName": {
                     "source": ['body.lastName'],
                     "required": false,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "profile": {
                     "source": ['body.profile'],
                     "required": false,
-                    "validation": {"type": "object"}
+                    "validation": { "type": "object" }
                 }
             },
 
@@ -591,7 +591,7 @@ module.exports = {
                 "id": {
                     "source": ['body.id'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "username": {
                     "source": ['body.username'],
@@ -604,17 +604,17 @@ module.exports = {
                 "firstName": {
                     "source": ['body.firstName'],
                     "required": false,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "lastName": {
                     "source": ['body.lastName'],
                     "required": false,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "email": {
                     "source": ['body.email'],
                     "required": false,
-                    "validation": {"type": "string", 'format': 'email'}
+                    "validation": { "type": "string", 'format': 'email' }
                 },
                 "groups": {
                     "source": ['body.groups'],
@@ -637,7 +637,7 @@ module.exports = {
                 "profile": {
                     "source": ['body.profile'],
                     "required": false,
-                    "validation": {"type": "object"}
+                    "validation": { "type": "object" }
                 }
             },
             '/admin/user/groups': {
@@ -701,12 +701,12 @@ module.exports = {
                 "id": {
                     "source": ['body.id'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "status": {
                     "source": ['body.status'],
                     "required": true,
-                    "validation": {"type": "string", "enum": ['active', 'inactive']}
+                    "validation": { "type": "string", "enum": ['active', 'inactive'] }
                 }
             },
 
@@ -718,17 +718,17 @@ module.exports = {
                 "id": {
                     "source": ['body.id'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "name": {
                     "source": ['body.name'],
                     "required": true,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "description": {
                     "source": ['body.description'],
                     "required": false,
-                    "validation": {"type": "string"}
+                    "validation": { "type": "string" }
                 },
                 "packages": {
                     "source": ['body.packages'],
