@@ -1,4 +1,5 @@
 'use strict';
+require('newrelic');
 
 /**
  * @license
