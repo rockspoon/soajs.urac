@@ -30,12 +30,12 @@ function Group(soajs, localConfig, mongoCore) {
 	}
 	if (!__self.mongoCore) {
 		__self.mongoCoreExternal = false;
-		__self.mongoCore = new Mongo(soajs.meta.tenantDB(soajs.registry.tenantMetaDB, localConfig.serviceName, soajs.tenant.code));
+		__self.mongoCore = new Mongo(soajs.meta.tenantDB(soajs.registry.tenantMetaDB, "urac", soajs.tenant.code));
 	}
 	if (indexing && soajs && soajs.tenant && soajs.tenant.id && !indexing[soajs.tenant.id]) {
 		indexing[soajs.tenant.id] = true;
-		
-		__self.mongoCore.createIndex(colName, {'code': 1}, {unique: true}, (err, index) => {
+
+		__self.mongoCore.createIndex(colName, { 'code': 1 }, { unique: true }, (err, index) => {
 			soajs.log.debug("Index: " + index + " created with error: " + err);
 		});
 		soajs.log.debug("Group: Indexes for " + soajs.tenant.id + " Updated!");
@@ -73,22 +73,22 @@ Group.prototype.getGroup = function (data, cb) {
 		return cb(error, null);
 	}
 	let condition = {};
-	
+
 	if (data.id) {
 		__self.validateId(data.id, (err, _id) => {
 			if (err) {
 				return cb(err, null);
 			}
-			condition = {'_id': _id};
+			condition = { '_id': _id };
 			__self.mongoCore.findOne(colName, condition, null, (err, record) => {
 				return cb(err, record);
 			});
 		});
 	} else {
 		if (data.code) {
-			condition = {'code': data.code};
+			condition = { 'code': data.code };
 		}
-		
+
 		__self.mongoCore.findOne(colName, condition, null, (err, record) => {
 			return cb(err, record);
 		});
@@ -140,7 +140,7 @@ Group.prototype.add = function (data, cb) {
 	}
 	__self.mongoCore.insert(colName, record, (err, record) => {
 		if (record && Array.isArray(record)) {
-			record = record [0];
+			record = record[0];
 		}
 		return cb(err, record);
 	});
@@ -166,7 +166,7 @@ Group.prototype.edit = function (data, cb) {
 		if (err) {
 			return cb(err, null);
 		}
-		
+
 		let s = {
 			'$set': {
 				'name': data.name
@@ -187,7 +187,7 @@ Group.prototype.edit = function (data, cb) {
 				s.$set['config.allowedPackages.' + prodPack.product] = prodPack.packages;
 			}
 		}
-		let condition = {'_id': _id};
+		let condition = { '_id': _id };
 		let extraOptions = {
 			'upsert': false,
 			'safe': true
@@ -217,7 +217,7 @@ Group.prototype.delete = function (data, cb) {
 		if (err) {
 			return cb(err, null);
 		}
-		let condition = {'_id': _id};
+		let condition = { '_id': _id };
 		__self.mongoCore.findOne(colName, condition, null, (err, record) => {
 			if (err) {
 				return cb(err);
@@ -262,11 +262,11 @@ Group.prototype.updateEnvironments = function (data, cb) {
 			s.$set['config.allowedEnvironments.' + env] = {};
 		}
 	}
-	
+
 	let _ids = [];
-	
+
 	if (data.groups.codes) {
-		let condition = {'code': {'$in': data.groups.codes}};
+		let condition = { 'code': { '$in': data.groups.codes } };
 		let extraOptions = {
 			'upsert': false,
 			'safe': true,
@@ -289,7 +289,7 @@ Group.prototype.updateEnvironments = function (data, cb) {
 			if (_ids.length === 0) {
 				return cb(null, []);
 			}
-			let condition = {'_id': {'$in': _ids}};
+			let condition = { '_id': { '$in': _ids } };
 			let extraOptions = {
 				'upsert': false,
 				'safe': true,
@@ -327,9 +327,9 @@ Group.prototype.updatePackages = function (data, cb) {
 		}
 	}
 	let _ids = [];
-	
+
 	if (data.groups.codes) {
-		let condition = {'code': {'$in': data.groups.codes}};
+		let condition = { 'code': { '$in': data.groups.codes } };
 		let extraOptions = {
 			'upsert': false,
 			'safe': true,
@@ -352,7 +352,7 @@ Group.prototype.updatePackages = function (data, cb) {
 			if (_ids.length === 0) {
 				return cb(null, []);
 			}
-			let condition = {'_id': {'$in': _ids}};
+			let condition = { '_id': { '$in': _ids } };
 			let extraOptions = {
 				'upsert': false,
 				'safe': true,
@@ -384,7 +384,7 @@ Group.prototype.deleteEnvironments = function (data, cb) {
 		let us = {
 			'$unset': {}
 		};
-		
+
 		for (let i = 0; i < data.environments.length; i++) {
 			let env = data.environments[i];
 			us.$unset['config.allowedEnvironments.' + env] = 1;
@@ -403,11 +403,11 @@ Group.prototype.deleteEnvironments = function (data, cb) {
 			if (err) {
 				return cb(err, null);
 			}
-			let condition = {'_id': _id};
+			let condition = { '_id': _id };
 			remove(condition);
 		});
 	} else {
-		let condition = {'code': data.code};
+		let condition = { 'code': data.code };
 		remove(condition);
 	}
 };
@@ -431,7 +431,7 @@ Group.prototype.deleteProducts = function (data, cb) {
 		let us = {
 			'$unset': {}
 		};
-		
+
 		for (let i = 0; i < data.products.length; i++) {
 			let prod = data.products[i];
 			us.$unset['config.allowedPackages.' + prod] = 1;
@@ -450,12 +450,12 @@ Group.prototype.deleteProducts = function (data, cb) {
 			if (err) {
 				return cb(err, null);
 			}
-			let condition = {'_id': _id};
+			let condition = { '_id': _id };
 			remove(condition);
-			
+
 		});
 	} else {
-		let condition = {'code': data.code};
+		let condition = { 'code': data.code };
 		remove(condition);
 	}
 };
@@ -463,12 +463,12 @@ Group.prototype.deleteProducts = function (data, cb) {
 
 Group.prototype.validateId = function (id, cb) {
 	let __self = this;
-	
+
 	if (!id) {
 		let error = new Error("Group: must provide an id.");
 		return cb(error, null);
 	}
-	
+
 	try {
 		id = __self.mongoCore.ObjectId(id);
 		return cb(null, id);
@@ -480,7 +480,7 @@ Group.prototype.validateId = function (id, cb) {
 
 Group.prototype.closeConnection = function () {
 	let __self = this;
-	
+
 	if (!__self.mongoCoreExternal) {
 		__self.mongoCore.closeDb();
 	}

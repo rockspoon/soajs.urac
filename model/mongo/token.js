@@ -27,7 +27,7 @@ function Token(soajs, localConfig, mongoCore) {
         if (soajs.tenant.type === "client" && soajs.tenant.main) {
             tCode = soajs.tenant.main.code;
         }
-        __self.mongoCore = new Mongo(soajs.meta.tenantDB(soajs.registry.tenantMetaDB, localConfig.serviceName, tCode));
+        __self.mongoCore = new Mongo(soajs.meta.tenantDB(soajs.registry.tenantMetaDB, "urac", soajs.tenant.code));
     }
     if (indexing && soajs && soajs.tenant && soajs.tenant.id && !indexing[soajs.tenant.id]) {
         indexing[soajs.tenant.id] = true;
@@ -36,14 +36,14 @@ function Token(soajs, localConfig, mongoCore) {
             'userId': 1,
             'service': 1,
             'status': 1
-        }, {unique: true}, (err, index) => {
+        }, { unique: true }, (err, index) => {
             soajs.log.debug("Index: " + index + " created with error: " + err);
         });
         __self.mongoCore.createIndex(colName, {
             'token': 1,
             'service': 1,
             'status': 1
-        }, {unique: true}, (err, index) => {
+        }, { unique: true }, (err, index) => {
             soajs.log.debug("Index: " + index + " created with error: " + err);
         });
 
@@ -116,7 +116,7 @@ Token.prototype.add = function (data, cb) {
             let error = new Error("Token: token for [" + data.service + "] was not created.");
             return cb(error);
         }
-        return cb(err, {'token': token, 'ttl': data.tokenExpiryTTL});
+        return cb(err, { 'token': token, 'ttl': data.tokenExpiryTTL });
     });
 };
 
@@ -136,7 +136,7 @@ Token.prototype.get = function (data, cb) {
         condition.service = data.service;
     }
     else {
-        condition.service = {'$in': data.services};
+        condition.service = { '$in': data.services };
     }
 
     __self.mongoCore.findOne(colName, condition, null, (err, record) => {
