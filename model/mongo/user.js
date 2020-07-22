@@ -34,6 +34,8 @@ function User(soajs, localConfig, mongoCore) {
     if (soajs.tenant.type === 'client' && soajs.tenant.main) {
       tCode = soajs.tenant.main.code;
     }
+    console.log(soajs.registry.tenantMetaDB);
+
     __self.mongoCore = new Mongo(
       soajs.meta.tenantDB(
         soajs.registry.tenantMetaDB,
@@ -324,7 +326,6 @@ User.prototype.updateOneField = function (data, cb) {
       s.$set.status = data.status;
     }
     console.log('data.status');
-    console.log(soajs.registry.tenantMetaDB);
     console.log(data.status);
     console.log(JSON.stringify(s));
     console.log(JSON.stringify(data));
