@@ -324,6 +324,7 @@ User.prototype.updateOneField = function (data, cb) {
       s.$set.status = data.status;
     }
     console.log('data.status');
+    console.log(soajs.registry.tenantMetaDB);
     console.log(data.status);
     console.log(JSON.stringify(s));
     console.log(JSON.stringify(data));
