@@ -706,7 +706,7 @@ module.exports = {
                 "status": {
                     "source": ['body.status'],
                     "required": true,
-                    "validation": { "type": "string", "enum": ['active', 'inactive'] }
+                    "validation": { "type": "string", "enum": ['active', 'inactive', 'pendingNew', 'pendingJoin'] }
                 }
             },
 
