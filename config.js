@@ -735,8 +735,7 @@ module.exports = {
           required: true,
           validation: {
             type: 'string',
-             enum: ['active', 'inactive', 'pendingNew', 'pendingJoin'] 
-            }
+            enum: ['active', 'inactive', 'pendingNew', 'pendingJoin'],
           },
         },
       },
