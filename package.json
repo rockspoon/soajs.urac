@@ -1,7 +1,7 @@
 {
   "name": "soajs.urac",
   "description": "soajs URAC service",
-  "version": "3.0.25",
+  "version": "3.1.13",
   "author": {
     "name": "soajs team",
     "email": "team@soajs.org"
@@ -28,13 +28,13 @@
     "grunt-jsdoc": "2.4.0",
     "grunt-mocha-test": "0.13.3",
     "mocha": "6.2.2",
-    "request": "2.88.0",
-    "soajs.controller": "3.*"
+    "request": "2.88.2",
+    "soajs.controller": "3.1.19"
   },
   "dependencies": {
-    "async": "3.1.0",
+    "async": "3.2.0",
     "newrelic": "^6.5.0",
-    "soajs": "2.6.5",
-    "uuid": "3.3.3"
+    "soajs": "3.0.17",
+    "uuid": "7.0.0"
   }
 }
