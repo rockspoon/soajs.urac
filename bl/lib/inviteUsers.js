@@ -20,7 +20,9 @@ let local = (soajs, inputmaskData, options, cb) => {
     if (!inputmaskData.users) {
         return cb(bl.user.handleError(soajs, 530, null));
     }
-
+    if (soajs.tenant.type === "product" || !soajs.tenant.main) {
+        return cb(bl.user.handleError(soajs, 534, null));
+    }
     let modelObj = bl.user.mt.getModel(soajs);
     options = {};
     options.mongoCore = modelObj.mongoCore;
@@ -74,6 +76,10 @@ let local = (soajs, inputmaskData, options, cb) => {
                     generatedPin = lib.pin.generate(pinConfig);
                     obj.tenant.pin.code = generatedPin;
                     obj.tenant.pin.allowed = !!oneUser.pin.allowed;
+                    if (!userRecord.tenant.pin) {
+                        userRecord.tenant.pin = {};
+                    }
+                    userRecord.tenant.pin.allowed = !!oneUser.pin.allowed;
                 } catch (e) {
                     responseObj.reason = "Failed to generate pin at this.";
                     records.failed.push(responseObj);
@@ -104,6 +110,7 @@ let local = (soajs, inputmaskData, options, cb) => {
         if (oneUser.user.id) {
             let responseObj = {"id": oneUser.user.id};
             data.id = oneUser.user.id;
+            data.keep = {"pin": true};
             bl.user.getUser(soajs, data, options, (error, userRecord) => {
                 return goInvite(error, userRecord, responseObj);
             });
@@ -111,6 +118,7 @@ let local = (soajs, inputmaskData, options, cb) => {
         else if (oneUser.user.username) {
             let responseObj = {"username": oneUser.user.username};
             data.username = oneUser.user.username;
+            data.keep = {"pin": true};
             bl.user.getUserByUsername(soajs, data, options, (error, userRecord) => {
                 return goInvite(error, userRecord, responseObj);
             });
@@ -118,6 +126,7 @@ let local = (soajs, inputmaskData, options, cb) => {
         else if (oneUser.user.email) {
             let responseObj = {"email": oneUser.user.email};
             data.username = oneUser.user.email;
+            data.keep = {"pin": true};
             bl.user.getUserByUsername(soajs, data, options, (error, userRecord) => {
                 return goInvite(error, userRecord, responseObj);
             });

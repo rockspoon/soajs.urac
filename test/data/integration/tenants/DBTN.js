@@ -47,15 +47,12 @@ let lib = {
                                     from: "me@localhost.com",
                                     transport: {
                                         type: "sendmail",
-                                        options: {
-
-                                        }
+                                        options: {}
                                     }
                                 }
                             },
                             urac: {
-                                hashIterations: 1024,
-                                seedLength: 32,
+                                hashIterations: 12,
                                 link: {
                                     addUser: "http://dashboard.soajs.org:80/#/setNewPassword",
                                     changeEmail: "http://dashboard.soajs.org:80/#/changeEmail/validate",
@@ -64,6 +61,11 @@ let lib = {
                                 },
                                 tokenExpiryTTL: 172800000,
                                 validateJoin: true,
+                                "membership": {
+                                    "basic": {
+                                        "groups": ["owner"]
+                                    }
+                                },
                                 mail: {
                                     join: {
                                         subject: "Welcome to SOAJS",
