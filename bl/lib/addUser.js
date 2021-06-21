@@ -46,7 +46,7 @@ let local = (soajs, inputmaskData, options, cb) => {
                     userRecord.pin = pinCode;
                     lib.mail.send(soajs, 'invitePin', userRecord, null, function (error) {
                         if (error) {
-                            soajs.log.info('invitePin: No Mail was sent: ' + error);
+                            soajs.log.info('invitePin: No Mail was sent: ' + error.message);
                         }
                     });
                 }
@@ -56,14 +56,13 @@ let local = (soajs, inputmaskData, options, cb) => {
 
                     lib.mail.send(soajs, "addUser", userRecord, null, function (error) {
                         if (error) {
-                            soajs.log.info('addUserNotPending: No Mail was sent: ' + error);
+                            soajs.log.info('addUserNotPending: No Mail was sent: ' + error.message);
                         }
                         return cb(null, {
                             id: userRecord._id.toString()
                         });
                     });
-                }
-                else {
+                } else {
                     let data = {};
                     data.userId = userRecord._id.toString();
                     data.username = userRecord.username;
@@ -75,7 +74,7 @@ let local = (soajs, inputmaskData, options, cb) => {
                         }
                         lib.mail.send(soajs, "addUser", userRecord, tokenRecord, function (error, mailRecord) {
                             if (error) {
-                                soajs.log.info('addUser: No Mail was sent: ' + error);
+                                soajs.log.info('addUser: No Mail was sent: ' + error.message);
                             }
                             return cb(null, {
                                 id: userRecord._id.toString(),
@@ -96,12 +95,12 @@ let local = (soajs, inputmaskData, options, cb) => {
                     generatedPin = lib.pin.generate(pinConfig);
                     if (mainTenant) {
                         inputmaskData.tenant.pin.code = generatedPin;
-                        inputmaskData.tenant.pin.allowed = !!inputmaskData.pin.allowed;
                     }
                     else {
                         inputmaskData.config.allowedTenants[0].tenant.pin.code = generatedPin;
                         inputmaskData.config.allowedTenants[0].tenant.pin.allowed = !!inputmaskData.pin.allowed;
                     }
+                    inputmaskData.tenant.pin.allowed = !!inputmaskData.pin.allowed;
                     doAdd(true, generatedPin);
                 } catch (e) {
                     //close model

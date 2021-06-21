@@ -20,13 +20,15 @@ let local = (soajs, inputmaskData, options, cb) => {
     if (!inputmaskData.users) {
         return cb(bl.user.handleError(soajs, 530, null));
     }
-
+    //if (soajs.tenant.type === "product" || !soajs.tenant.main) {
+    //    return cb(bl.user.handleError(soajs, 534, null));
+    //}
     let modelObj = bl.user.mt.getModel(soajs);
     options = {};
     options.mongoCore = modelObj.mongoCore;
 
     let data = {
-        "status": "active"
+        //"status": "active"
     };
 
     let records = {"succeeded": [], "failed": []};
@@ -34,6 +36,12 @@ let local = (soajs, inputmaskData, options, cb) => {
 
         let goInvite = (error, userRecord, responseObj) => {
             if (error) {
+                records.failed.push(responseObj);
+                return callback();
+            }
+            if (userRecord.tenant.id === soajs.tenant.id) {
+                responseObj.reason = bl.user.localConfig.errors[536];//"User is already in the tenant tenancy.";
+                responseObj.id = userRecord._id;
                 records.failed.push(responseObj);
                 return callback();
             }
@@ -52,7 +60,8 @@ let local = (soajs, inputmaskData, options, cb) => {
                 });
             }
             if (found) {
-                responseObj.reason = "User has already been invited.";
+                responseObj.reason = bl.user.localConfig.errors[529];//"User has already been invited.";
+                responseObj.id = userRecord._id;
                 records.failed.push(responseObj);
                 return callback();
             }
@@ -74,6 +83,10 @@ let local = (soajs, inputmaskData, options, cb) => {
                     generatedPin = lib.pin.generate(pinConfig);
                     obj.tenant.pin.code = generatedPin;
                     obj.tenant.pin.allowed = !!oneUser.pin.allowed;
+                    if (!userRecord.tenant.pin) {
+                        userRecord.tenant.pin = {};
+                    }
+                    userRecord.tenant.pin.allowed = !!oneUser.pin.allowed;
                 } catch (e) {
                     responseObj.reason = "Failed to generate pin at this.";
                     records.failed.push(responseObj);
@@ -89,12 +102,14 @@ let local = (soajs, inputmaskData, options, cb) => {
                     return callback();
                 }
                 if (response) {
-                    userRecord.pin = generatedPin;
-                    lib.mail.send(soajs, 'invitePin', userRecord, null, function (error) {
-                        if (error) {
-                            soajs.log.info('invitePin: No Mail was sent: ' + error);
-                        }
-                    });
+                    if (generatedPin) {
+                        userRecord.pin = generatedPin;
+                        lib.mail.send(soajs, 'invitePin', userRecord, null, function (error) {
+                            if (error) {
+                                soajs.log.info('invitePin: No Mail was sent: ' + error.message);
+                            }
+                        });
+                    }
                 }
                 records.succeeded.push(responseObj);
                 return callback();
@@ -104,25 +119,25 @@ let local = (soajs, inputmaskData, options, cb) => {
         if (oneUser.user.id) {
             let responseObj = {"id": oneUser.user.id};
             data.id = oneUser.user.id;
+            data.keep = {"pin": true};
             bl.user.getUser(soajs, data, options, (error, userRecord) => {
                 return goInvite(error, userRecord, responseObj);
             });
-        }
-        else if (oneUser.user.username) {
+        } else if (oneUser.user.username) {
             let responseObj = {"username": oneUser.user.username};
             data.username = oneUser.user.username;
+            data.keep = {"pin": true};
             bl.user.getUserByUsername(soajs, data, options, (error, userRecord) => {
                 return goInvite(error, userRecord, responseObj);
             });
-        }
-        else if (oneUser.user.email) {
+        } else if (oneUser.user.email) {
             let responseObj = {"email": oneUser.user.email};
             data.username = oneUser.user.email;
+            data.keep = {"pin": true};
             bl.user.getUserByUsername(soajs, data, options, (error, userRecord) => {
                 return goInvite(error, userRecord, responseObj);
             });
-        }
-        else {
+        } else {
             let responseObj = {"reason": "Cannot invite a user without providing its id or username."};
             records.failed.push(responseObj);
             return callback();

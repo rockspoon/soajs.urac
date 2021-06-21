@@ -10,22 +10,40 @@
 
 module.exports = {
     "type": 'service',
+    'subType': 'soajs',
+    "description": "User Registration and Access Control ( URAC ), is a SOAJS multi-tenant service to manage users accounts, groups and access levels for all tenants.",
     "prerequisites": {
         "cpu": '',
         "memory": ''
     },
     "serviceVersion": 3,
     "serviceName": "urac",
-    "serviceGroup": "SOAJS Core Services",
+    "serviceGroup": "Gateway",
     "servicePort": 4001,
     "requestTimeout": 30,
     "requestTimeoutRenewal": 5,
     "extKeyRequired": true,
     "oauth": true,
-
-
+    "urac": true,
+    "maintenance": {
+        "readiness": "/heartbeat",
+        "port": {"type": "maintenance"},
+        "commands": [
+            {"label": "Reload Registry", "path": "/reloadRegistry", "icon": "fas fa-undo"},
+            {"label": "Resource Info", "path": "/resourceInfo", "icon": "fas fa-info"}
+        ]
+    },
+    "tags": ["users", "registration", "groups", "membership", "join"],
+    "attributes": {
+        "authentication": ["multitenant", "roaming", "invitation"],
+        "role": ["management", "acl"]
+    },
+    "program": ["soajs"],
+    "documentation": {
+        "readme": "/README.md",
+        "release": "/RELEASE.md"
+    },
     //-------------------------------------
-    'awareness': false,
     "hashIterations": 12,
 
     "pinConfiguration": {
@@ -52,6 +70,9 @@ module.exports = {
         531: "Error while trying to invite users.",
         532: "user [id | username | email] is required",
         533: "No changes to update",
+        534: "Main tenant cannot invite users",
+        535: "Sub tenant cannot self invite a user.",
+        536: "User is already in the tenant tenancy.",
 
         599: "Token has expired.",
         600: "unable to find token.",
@@ -63,11 +84,9 @@ module.exports = {
         "commonFields": {
             "keywords": {
                 "source": ['query.keywords', 'body.keywords'],
-                "required": false,
                 "validation": {"type": "string"}
             },
             "start": {
-                "required": false,
                 "source": ["query.start", "body.start"],
                 "default": 0,
                 "validation": {
@@ -76,7 +95,6 @@ module.exports = {
                 }
             },
             "limit": {
-                "required": false,
                 "source": ["query.limit", "body.limit"],
                 "default": 1000,
                 "validation": {
@@ -146,6 +164,17 @@ module.exports = {
                     "validation": {"type": "string"}
                 }
             },
+            '/emailToken': {
+                "_apiInfo": {
+                    "l": "Check if user (username or email) status if pendingJoin or pendingNew and send a new token email",
+                    "group": "My account guest"
+                },
+                "username": {
+                    "source": ['query.username'],
+                    "required": true,
+                    "validation": {"type": "string"}
+                }
+            },
             '/validate/changeEmail': {
                 "_apiInfo": {
                     "l": "To validate change email",
@@ -169,7 +198,12 @@ module.exports = {
                     "validation": {"type": "string"}
                 }
             },
-
+            '/user/tenants': {
+                "_apiInfo": {
+                    "l": "Get logged in user tenants",
+                    "group": "User administration"
+                }
+            },
             '/admin/user': {
                 "_apiInfo": {
                     "l": "Get user by id",
@@ -190,8 +224,11 @@ module.exports = {
                 "commonFields": ["start", "limit", "keywords"],
                 "config": {
                     "source": ['query.config'],
-                    "required": false,
                     "validation": {"type": "boolean"}
+                },
+                "scope": {
+                    "source": ['query.scope'],
+                    "validation": {"type": "string", "enum": ["myTenancy", "otherTenancy", "otherTenancyInvited"]}
                 }
             },
             '/admin/users/count': {
@@ -199,7 +236,11 @@ module.exports = {
                     "l": "Get users count matching certain keywords",
                     "group": "User administration"
                 },
-                "commonFields": ["keywords"]
+                "commonFields": ["keywords"],
+                "scope": {
+                    "source": ['query.scope'],
+                    "validation": {"type": "string", "enum": ["myTenancy", "otherTenancy", "otherTenancyInvited"]}
+                }
             },
 
             '/admin/groups': {
@@ -215,12 +256,10 @@ module.exports = {
                 },
                 "id": {
                     "source": ['query.id'],
-                    "required": false,
                     "validation": {"type": "string"}
                 },
                 "code": {
                     "source": ['query.code'],
-                    "required": false,
                     "validation": {"type": "string"}
                 }
             },
@@ -229,6 +268,10 @@ module.exports = {
                 "_apiInfo": {
                     "l": "Get all users and groups of a main tenant",
                     "group": "Administration"
+                },
+                "scope": {
+                    "source": ['query.scope'],
+                    "validation": {"type": "string", "enum": ["myTenancy", "otherTenancy", "otherTenancyInvited"]}
                 }
             }
         },
@@ -241,8 +284,11 @@ module.exports = {
                 },
                 "email": {
                     "source": ['body.email'],
-                    "required": true,
                     "validation": {"type": "string", "format": "email"}
+                },
+                "id": {
+                    "source": ['body.id'],
+                    "validation": {"type": "string"}
                 },
                 "what": {
                     "source": ['body.what'],
@@ -251,7 +297,6 @@ module.exports = {
                 },
                 "data": {
                     "source": ['body.data'],
-                    "required": false,
                     "validation": {
                         "type": "object"
                     }
@@ -295,8 +340,15 @@ module.exports = {
                 },
                 "profile": {
                     "source": ['body.profile'],
-                    "required": false,
                     "validation": {"type": "object"}
+                },
+                "membership": {
+                    "source": ['body.membership'],
+                    "validation": {"type": "string"}
+                },
+                "ln": {
+                    "source": ['body.ln'],
+                    "validation": {"type": "string"}
                 }
             },
 
@@ -332,12 +384,10 @@ module.exports = {
                 },
                 "profile": {
                     "source": ['body.profile'],
-                    "required": false,
                     "validation": {"type": "object"}
                 },
                 "groups": {
                     "source": ['body.groups'],
-                    "required": false,
                     "validation": {
                         "type": "array",
                         "items": {
@@ -348,7 +398,6 @@ module.exports = {
                 "status": {
                     "source": ['body.status'],
                     "default": "pendingNew",
-                    "required": false,
                     "validation": {
                         "type": "string",
                         "enum": ['active', 'inactive', 'pendingNew']
@@ -356,26 +405,27 @@ module.exports = {
                 },
                 "password": {
                     "source": ['body.password'],
-                    "required": false,
                     "validation": {"type": "string"}
                 },
                 "pin": {
                     "source": ['body.pin'],
-                    "required": false,
                     "validation": {
                         "type": "object",
+                        "additionalProperties": false,
                         "properties": {
                             "code": {
-                                "required": true,
                                 "type": 'boolean'
                             },
                             "allowed": {
-                                "required": true,
                                 "type": 'boolean'
                             }
                         },
-                        "additionalProperties": false
+                        "required": ["code", "allowed"]
                     }
+                },
+                "ln": {
+                    "source": ['body.ln'],
+                    "validation": {"type": "string"}
                 }
             },
 
@@ -399,7 +449,6 @@ module.exports = {
                 },
                 "config": {
                     "source": ['body.config'],
-                    "required": false,
                     "validation": {"type": "boolean"}
                 }
             },
@@ -436,7 +485,8 @@ module.exports = {
                         "items": {
                             "type": "object",
                             "minItems": 1,
-                            "patternProperties": {
+                            "additionalProperties": false,
+                            "properties": {
                                 "product": {
                                     "type": "string"
                                 },
@@ -448,19 +498,84 @@ module.exports = {
                                     }
                                 }
                             },
-                            "additionalProperties": false
+                            "required": ["product", "packages"]
                         }
                     }
                 },
                 "environments": {
                     "source": ['body.environments'],
-                    "required": false,
                     "validation": {
                         "type": "array",
                         "items": {
                             "type": "string",
                             "minItems": 1,
                             "pattern": "^([A-Za-z]+)$"
+                        }
+                    }
+                }
+            },
+            '/admin/groups': {
+                "_apiInfo": {
+                    "l": "Add groups",
+                    "group": "Group administration"
+                },
+                "tenant": {
+                    "source": ['body.tenant'],
+                    "validation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "id": {
+                                "type": 'string'
+                            },
+                            "code": {
+                                "type": 'string'
+                            }
+                        },
+                        "required": ["id", "code"]
+                    }
+                },
+                "groups": {
+                    "source": ['body.groups'],
+                    "required": true,
+                    "validation": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "minItems": 1,
+                            "properties": {
+                                "code": {
+                                    "type": "string",
+                                    "format": "alphanumeric",
+                                    "maxLength": 20
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": "description"
+                                },
+                                "packages": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "minItems": 1,
+                                        "properties": {
+                                            "product": {
+                                                "type": "string"
+                                            },
+                                            "packages": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string",
+                                                    "minItems": 1,
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "requires": ["code", "name", "description", "packages"]
                         }
                     }
                 }
@@ -472,6 +587,17 @@ module.exports = {
                 "_apiInfo": {
                     "l": "Delete group",
                     "group": "Group administration"
+                },
+                "id": {
+                    "source": ['query.id'],
+                    "required": true,
+                    "validation": {"type": "string"}
+                }
+            },
+            '/admin/user': {
+                "_apiInfo": {
+                    "l": "Delete user",
+                    "group": "User administration"
                 },
                 "id": {
                     "source": ['query.id'],
@@ -560,7 +686,6 @@ module.exports = {
                 },
                 "username": {
                     "source": ['body.username'],
-                    "required": false,
                     "validation": {
                         "type": "string",
                         "pattern": /^[a-zA-Z0-9_-]+$/
@@ -568,18 +693,19 @@ module.exports = {
                 },
                 "firstName": {
                     "source": ['body.firstName'],
-                    "required": false,
                     "validation": {"type": "string"}
                 },
                 "lastName": {
                     "source": ['body.lastName'],
-                    "required": false,
                     "validation": {"type": "string"}
                 },
                 "profile": {
                     "source": ['body.profile'],
-                    "required": false,
                     "validation": {"type": "object"}
+                },
+                "ln": {
+                    "source": ['body.ln'],
+                    "validation": {"type": "string"}
                 }
             },
 
@@ -595,7 +721,6 @@ module.exports = {
                 },
                 "username": {
                     "source": ['body.username'],
-                    "required": false,
                     "validation": {
                         "type": "string",
                         "pattern": /^[a-zA-Z0-9_-]+$/
@@ -603,22 +728,18 @@ module.exports = {
                 },
                 "firstName": {
                     "source": ['body.firstName'],
-                    "required": false,
                     "validation": {"type": "string"}
                 },
                 "lastName": {
                     "source": ['body.lastName'],
-                    "required": false,
                     "validation": {"type": "string"}
                 },
                 "email": {
                     "source": ['body.email'],
-                    "required": false,
                     "validation": {"type": "string", 'format': 'email'}
                 },
                 "groups": {
                     "source": ['body.groups'],
-                    "required": false,
                     "validation": {
                         "type": "array",
                         "items": {
@@ -628,16 +749,18 @@ module.exports = {
                 },
                 "status": {
                     "source": ['body.status'],
-                    "required": false,
                     "validation": {
                         "type": "string",
-                        "enum": ['active', 'inactive', 'pendingNew']
+                        "enum": ['active', 'inactive', 'pendingNew', 'pendingJoin']
                     }
                 },
                 "profile": {
                     "source": ['body.profile'],
-                    "required": false,
                     "validation": {"type": "object"}
+                },
+                "ln": {
+                    "source": ['body.ln'],
+                    "validation": {"type": "string"}
                 }
             },
             '/admin/user/groups': {
@@ -683,8 +806,7 @@ module.exports = {
                                         "required": true
                                     },
                                     "allowed": {
-                                        "type": "boolean",
-                                        "required": false
+                                        "type": "boolean"
                                     }
                                 }
                             ]
@@ -727,18 +849,16 @@ module.exports = {
                 },
                 "description": {
                     "source": ['body.description'],
-                    "required": false,
                     "validation": {"type": "string"}
                 },
                 "packages": {
                     "source": ['body.packages'],
-                    "required": false,
                     "validation": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "minItems": 1,
-                            "patternProperties": {
+                            "properties": {
                                 "product": {
                                     "type": "string"
                                 },
@@ -756,7 +876,6 @@ module.exports = {
                 },
                 "environments": {
                     "source": ['body.environments'],
-                    "required": false,
                     "validation": {
                         "type": "array",
                         "items": {
@@ -821,7 +940,7 @@ module.exports = {
                         "items": {
                             "type": "object",
                             "minItems": 1,
-                            "patternProperties": {
+                            "properties": {
                                 "product": {
                                     "type": "string"
                                 },
@@ -860,29 +979,30 @@ module.exports = {
                 }
             },
 
-            /*
-            *
-            * since we have invite and un-invite users, no need for these 2
-            *
 
-            '/admin/user/invite': {
+            '/admin/user/self/invite': {
                 "_apiInfo": {
-                    "l": "Invite user by id or username as username or email",
+                    "l": "Self Invite user by id or username as username or email",
                     "group": "User administration"
                 },
-                "id": {
-                    "source": ['body.id'],
-                    "required": false,
-                    "validation": {"type": "string"}
-                },
-                "username": {
-                    "source": ['body.username'],
-                    "required": false,
-                    "validation": {"type": "string"}
+                "pin": {
+                    "source": ['body.pin'],
+                    "validation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                            "code": {
+                                "type": "boolean"
+                            },
+                            "allowed": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": ["code", "allowed"]
+                    }
                 },
                 "groups": {
                     "source": ['body.groups'],
-                    "required": false,
                     "validation": {
                         "type": "array",
                         "items": {
@@ -890,42 +1010,24 @@ module.exports = {
                         }
                     }
                 },
-                "pin": {
-                    "source": ['body.pin'],
-                    "required": false,
+                "tenant": {
+                    "required": true,
+                    "source": ['body.tenant'],
                     "validation": {
                         "type": "object",
+                        "additionalProperties": false,
                         "properties": {
                             "code": {
-                                "type": "boolean",
-                                "required": true
+                                "type": "string"
                             },
-                            "allowed": {
-                                "type": "boolean",
-                                "required": true
+                            "id": {
+                                "type": "string"
                             }
-                        }
+                        },
+                        "required": ["code", "id"]
                     }
                 }
             },
-
-            "/admin/user/uninvite": {
-                "_apiInfo": {
-                    "l": "un-Invite user by id or username as username or email",
-                    "group": "User administration"
-                },
-                "id": {
-                    "source": ['body.id'],
-                    "required": false,
-                    "validation": {"type": "string"}
-                },
-                "username": {
-                    "source": ['body.username'],
-                    "required": false,
-                    "validation": {"type": "string"}
-                }
-            },
-            */
 
             '/admin/users/invite': {
                 "_apiInfo": {
@@ -966,21 +1068,18 @@ module.exports = {
                                     }
                                 },
                                 "pin": {
-                                    "required": false,
                                     "type": "object",
                                     "properties": {
                                         "code": {
-                                            "type": "boolean",
-                                            "required": true
+                                            "type": "boolean"
                                         },
                                         "allowed": {
-                                            "type": "boolean",
-                                            "required": true
+                                            "type": "boolean"
                                         }
-                                    }
+                                    },
+                                    "required": ["code", "allowed"]
                                 },
                                 "groups": {
-                                    "required": false,
                                     "validation": {
                                         "type": "array",
                                         "items": {

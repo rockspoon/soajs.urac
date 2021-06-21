@@ -8,6 +8,8 @@
  * found in the LICENSE file at the root of this repository
  */
 
+const get = (p, o) => p.reduce((xs, x) => (xs && xs[x]) ? xs[x] : null, o);
+
 const async = require("async");
 const colName = "users";
 const core = require("soajs");
@@ -17,8 +19,9 @@ let indexing = {};
 
 function User(soajs, localConfig, mongoCore) {
     let __self = this;
-    if (__self.log) {
-        __self.log = soajs.log;
+    __self.keepConnectionAlive = false;
+    if (soajs.log && soajs.log.error) {
+        __self.log = soajs.log.error;
     } else {
         __self.log = (log) => {
             console.log(log);
@@ -31,75 +34,96 @@ function User(soajs, localConfig, mongoCore) {
     if (!__self.mongoCore) {
         __self.mongoCoreExternal = false;
         let tCode = soajs.tenant.code;
-        if (soajs.tenant.type === "client" && soajs.tenant.main) {
+        if (soajs.tenant.main && soajs.tenant.main.code) {
             tCode = soajs.tenant.main.code;
         }
+        let masterCode = get(["registry", "custom", "urac", "value", "masterCode"], soajs);
+        if (masterCode) {
+            tCode = masterCode;
+        } else {
+            let dbCodes = get(["registry", "custom", "urac", "value", "dbCodes"], soajs);
+            if (dbCodes) {
+                for (let c in dbCodes) {
+                    if (dbCodes.hasOwnProperty(c)) {
+                        if (dbCodes[c].includes(tCode)) {
+                            tCode = c;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         __self.mongoCore = new Mongo(soajs.meta.tenantDB(soajs.registry.tenantMetaDB, localConfig.serviceName, tCode));
-    }
-    if (indexing && soajs && soajs.tenant && soajs.tenant.id && !indexing[soajs.tenant.id]) {
-        indexing[soajs.tenant.id] = true;
 
-        __self.mongoCore.createIndex(colName, {'tenant.id': 1}, {}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
-        __self.mongoCore.createIndex(colName, {'username': 1, 'email': 1, 'status': 1}, {}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
-        __self.mongoCore.createIndex(colName, {'_id': 1, 'status': 1}, {}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
-        __self.mongoCore.createIndex(colName, {
-            'username': 1,
-            'email': 1,
-            'firstName': 1,
-            'lastName': 1
-        }, {}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
+        __self.indexCount = 0;
+        __self.counter = 0;
+        if (indexing && tCode && !indexing[tCode]) {
+            indexing[tCode] = true;
 
-        //the following are set @ urac.driver
-        __self.mongoCore.createIndex(colName, {"username": 1}, {unique: true}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
-        __self.mongoCore.createIndex(colName, {"email": 1}, {unique: true}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
-
-        __self.mongoCore.createIndex(colName, {'config.allowedTenants.tenant.id': 1}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
-        __self.mongoCore.createIndex(colName,
-            {
-                "config.allowedTenants.tenant.pin.code": 1,
-                "config.allowedTenants.tenant.id": 1
-            },
-            {
-                unique: true,
-                partialFilterExpression: {
-                    "config.allowedTenants.tenant.pin.code": {
-                        "$exists": true
+            let indexes = [
+                {"col": colName, "i": {'tenant.id': 1}, "o": {}},
+                {"col": colName, "i": {'username': 1, 'email': 1, 'status': 1}, "o": {}},
+                {"col": colName, "i": {'_id': 1, 'status': 1}, "o": {}},
+                {
+                    "col": colName, "i": {
+                        'username': 1,
+                        'email': 1,
+                        'firstName': 1,
+                        'lastName': 1,
+                        'tenant.id': 1
+                    }, "o": {}
+                },
+                {
+                    "col": colName, "i": {
+                        'username': 1,
+                        'email': 1,
+                        'firstName': 1,
+                        'lastName': 1,
+                        'config.allowedTenants.tenant.id': 1
+                    }, "o": {}
+                },
+                {"col": colName, "i": {"username": 1}, "o": {unique: true}},
+                {"col": colName, "i": {"email": 1}, "o": {unique: true}},
+                {"col": colName, "i": {'config.allowedTenants.tenant.id': 1}, "o": {}},
+                {
+                    "col": colName, "i": {
+                        "config.allowedTenants.tenant.pin.code": 1,
+                        "config.allowedTenants.tenant.id": 1
+                    }, "o": {
+                        unique: true,
+                        partialFilterExpression: {
+                            "config.allowedTenants.tenant.pin.code": {
+                                "$exists": true
+                            }
+                        }
+                    }
+                },
+                {
+                    "col": colName, "i": {
+                        "tenant.pin.code": 1,
+                        "tenant.id": 1
+                    }, "o": {
+                        unique: true,
+                        partialFilterExpression: {
+                            "tenant.pin.code": {
+                                "$exists": true
+                            }
+                        }
                     }
                 }
-            }, (err, index) => {
-                soajs.log.debug("Index: " + index + " created with error: " + err);
-            });
-        __self.mongoCore.createIndex(colName,
-            {
-                "tenant.pin.code": 1,
-                "tenant.id": 1
-            },
-            {
-                unique: true,
-                partialFilterExpression: {
-                    "tenant.pin.code": {
-                        "$exists": true
-                    }
-                }
-            }, (err, index) => {
-                soajs.log.debug("Index: " + index + " created with error: " + err);
-            });
+            ];
+            __self.indexCount = indexes.length;
+            indexing._len = indexes.length;
 
-        soajs.log.debug("User: Indexes for " + soajs.tenant.id + " Updated!");
+            for (let i = 0; i < indexes.length; i++) {
+                __self.mongoCore.createIndex(indexes[i].col, indexes[i].i, indexes[i].o, (err, index) => {
+                    soajs.log.debug("Index: " + index + " created with error: " + err);
+                    __self.counter++;
+                });
+            }
+
+            soajs.log.debug("User: Indexes for " + tCode + " Updated!");
+        }
     }
 }
 
@@ -121,18 +145,35 @@ User.prototype.cleanDeletedGroup = function (data, cb) {
     if (data.tenant.type === "client" && data.tenant.main) {
         //TODO: clean up from sub tenant & index
         let condition = {"config.allowedTenants.tenant.id": data.tenant.id};
-        let extraOptions = {multi: true};
+        let extraOptions = {};
         let s = {"$pull": {"config.allowedTenants.$.groups": data.groupCode}};
-        __self.mongoCore.update(colName, condition, s, extraOptions, (err, response) => {
-            return cb(err, response);
+        __self.mongoCore.updateMany(colName, condition, s, extraOptions, (err, result) => {
+            if (err) {
+                return cb(err);
+            } else {
+                if (result && result.nModified) {
+                    result = result.nModified;
+                } else {
+                    result = 0;
+                }
+                return cb(err, result);
+            }
         });
-    }
-    else {
+    } else {
         let condition = {"tenant.id": data.tenant.id};
-        let extraOptions = {multi: true};
+        let extraOptions = {};
         let s = {"$pull": {groups: data.groupCode}};
-        __self.mongoCore.update(colName, condition, s, extraOptions, (err, response) => {
-            return cb(err, response);
+        __self.mongoCore.updateMany(colName, condition, s, extraOptions, (err, result) => {
+            if (err) {
+                return cb(err);
+            } else {
+                if (result && result.nModified) {
+                    result = result.nModified;
+                } else {
+                    result = 0;
+                }
+                return cb(err, result);
+            }
         });
     }
 };
@@ -163,20 +204,22 @@ User.prototype.getUserByUsername = function (data, cb) {
     if (data.status) {
         if (Array.isArray(data.status)) {
             condition.status = {"$in": data.status};
-        }
-        else {
+        } else {
             condition.status = data.status;
         }
     }
     let options = {
-        "fields": {
-            'password': 0,
-            'config': 0,
-            'socialId': 0,
-            'tenant.pin.code': 0,
-            'config.allowedTenants.tenant.pin.code': 0
+        "projection": {
+            "password": 0,
+            "config": 0,
+            "socialId": 0,
+            "tenant.pin.code": 0
         }
     };
+    if (data.keep && data.keep.pin) {
+        delete options.projection.config;
+        delete options.projection["tenant.pin.code"];
+    }
     __self.mongoCore.findOne(colName, condition, options, (err, record) => {
         return cb(err, record);
     });
@@ -206,24 +249,30 @@ User.prototype.getUser = function (data, cb) {
         if (data.status) {
             if (Array.isArray(data.status)) {
                 condition.status = {"$in": data.status};
-            }
-            else {
+            } else {
                 condition.status = data.status;
             }
         }
         let options = {
-            "fields": {
-                'password': 0,
-                'config': 0,
-                'socialId': 0,
-                'tenant.pin.code': 0,
-                'config.allowedTenants.tenant.pin.code': 0
+            "projection": {
+                "password": 0,
+                "config": 0,
+                "socialId": 0,
+                "tenant.pin.code": 0
             }
         };
-        if (data.keep && data.keep.pwd) {
-            delete options.fields.password;
+        if (data.keep && data.keep.pin) {
+            delete options.projection.config;
+            delete options.projection["tenant.pin.code"];
         }
-
+        if (data.keep && data.keep.allowedTenants) {
+            delete options.projection.config;
+            delete options.projection["config.allowedTenants.tenant.pin.code"];
+            options.projection["config.allowedTenants.tenant.pin"] = 0;
+        }
+        if (data.keep && data.keep.pwd) {
+            delete options.projection.password;
+        }
         __self.mongoCore.findOne(colName, condition, options, (err, record) => {
             return cb(err, record);
         });
@@ -277,8 +326,7 @@ User.prototype.updateOneField = function (data, cb) {
             }
             doUpdate(_id);
         });
-    }
-    else {
+    } else {
         doUpdate(data._id);
     }
 };
@@ -310,15 +358,28 @@ User.prototype.getUsers = function (data, cb) {
             {"lastName": {"$regex": rePattern}},
         ];
     }
-    options.fields = {
+    options.projection = {
         'password': 0,
         'config': 0,
         'socialId': 0,
-        'tenant.pin.code': 0,
-        'config.allowedTenants.tenant.pin.code': 0
+        'tenant.pin.code': 0
     };
     if (data && data.config) {
-        delete options.fields.config;
+        delete options.projection.config;
+        options.projection['config.allowedTenants.tenant.pin.code'] = 0;
+    }
+    if (data && data.tenant && data.tenant.main && data.tenant.main.id) {
+        condition["config.allowedTenants.tenant.id"] = data.tenant.id;
+    } else if (data && data.scope) {
+        let tId = data.tenant.id;
+        if (data.scope === "myTenancy") {
+            condition["tenant.id"] = tId;
+        } else if (data.scope === "otherTenancy") {
+            condition["tenant.id"] = {"$ne": tId};
+        } else if (data.scope === "otherTenancyInvited") {
+            condition["tenant.id"] = {"$ne": tId};
+            condition["config.allowedTenants.tenant.id"] = tId;
+        }
     }
     __self.mongoCore.find(colName, condition, options, (err, records) => {
         return cb(err, records);
@@ -365,15 +426,15 @@ User.prototype.getUsersByIds = function (data, cb) {
             options.limit = data.limit;
             options.sort = {};
         }
-        options.fields = {
+        options.projection = {
             'password': 0,
             'config': 0,
             'socialId': 0,
-            'tenant.pin.code': 0,
-            'config.allowedTenants.tenant.pin.code': 0
+            'tenant.pin.code': 0
         };
         if (data && data.config) {
-            delete options.fields.config;
+            delete options.projection.config;
+            options.projection['config.allowedTenants.tenant.pin.code'] = 0;
         }
         __self.mongoCore.find(colName, condition, options, (err, records) => {
             return cb(err, records);
@@ -414,7 +475,7 @@ User.prototype.checkUsername = function (data, cb) {
     if (data.exclude_id) {
         condition._id = {"$ne": data.exclude_id};
     }
-    __self.mongoCore.count(colName, condition, (err, count) => {
+    __self.mongoCore.countDocuments(colName, condition, {}, (err, count) => {
         return cb(err, count);
     });
 };
@@ -440,7 +501,20 @@ User.prototype.countUsers = function (data, cb) {
             {"lastName": {"$regex": rePattern}}
         ];
     }
-    __self.mongoCore.count(colName, condition, (err, count) => {
+    if (data && data.tenant && data.tenant.main && data.tenant.main.id) {
+        condition["config.allowedTenants.tenant.id"] = data.tenant.id;
+    } else if (data && data.scope) {
+        let tId = data.tenant.id;
+        if (data.scope === "myTenancy") {
+            condition["tenant.id"] = tId;
+        } else if (data.scope === "otherTenancy") {
+            condition["tenant.id"] = {"$ne": tId};
+        } else if (data.scope === "otherTenancyInvited") {
+            condition["tenant.id"] = {"$ne": tId};
+            condition["config.allowedTenants.tenant.id"] = tId;
+        }
+    }
+    __self.mongoCore.countDocuments(colName, condition, {}, (err, count) => {
         return cb(err, count);
     });
 };
@@ -473,6 +547,9 @@ User.prototype.add = function (data, cb) {
 
         "tenant": data.tenant
     };
+    if (data.ln) {
+        record.ln = data.ln;
+    }
 
     record.ts = new Date().getTime();
 
@@ -480,7 +557,7 @@ User.prototype.add = function (data, cb) {
     record.groups = data.groups || [];
     record.config = data.config || {};
 
-    __self.mongoCore.insert(colName, record, (err, record) => {
+    __self.mongoCore.insertOne(colName, record, {}, (err, record) => {
         if (record && Array.isArray(record)) {
             record = record [0];
         }
@@ -536,18 +613,19 @@ User.prototype.edit = function (data, cb) {
             if (data.status) {
                 s.$set.status = data.status;
             }
+            if (data.ln) {
+                s.$set.ln = data.ln;
+            }
             __self.mongoCore.updateOne(colName, condition, s, extraOptions, (err, record) => {
-                if (err) {
-                    return cb(err);
+                let nModified = 0;
+                if (!record) {
+                    nModified = 0;
+                } else {
+                    nModified = record.nModified || 0;
                 }
-                if (!record || (record && !record.nModified)) {
-                    let error = new Error("User: user [" + _id.toString() + "] was not update.");
-                    return cb(error);
-                }
-                return cb(null, record.nModified);
+                return cb(err, nModified);
             });
-        }
-        else {
+        } else {
             let error = new Error("User: nothing to update.");
             return cb(error);
         }
@@ -559,8 +637,7 @@ User.prototype.edit = function (data, cb) {
             }
             doUpdate(_id);
         });
-    }
-    else {
+    } else {
         doUpdate(data._id);
     }
 };
@@ -588,11 +665,13 @@ User.prototype.save = function (data, cb) {
     };
     let s = {'$set': data};
     __self.mongoCore.updateOne(colName, condition, s, extraOptions, (err, record) => {
-        if (!record || (record && !record.nModified)) {
-            let error = new Error("User: user [" + data._id.toString() + "] was not saved.");
-            return cb(error);
+        let nModified = 0;
+        if (!record) {
+            nModified = 0;
+        } else {
+            nModified = record.nModified || 0;
         }
-        return cb(err, record.nModified);
+        return cb(err, nModified);
     });
 };
 
@@ -607,13 +686,8 @@ User.prototype.save = function (data, cb) {
  */
 User.prototype.uninvite = function (data, cb) {
     let __self = this;
-    if (!data || !data.user || !(data.user.id || data.user.username || data.user.email) || !data.status || !data.tenant) {
-        let error = new Error("User: user [id | username | email], status, and tenant information are required.");
-        return cb(error, null);
-    }
-
-    if (data.tenant.type !== "client" && !data.tenant.main) {
-        let error = new Error("User: un-invite only works for sub tenant.");
+    if (!data || !data.user || !(data.user.id || data.user.username || data.user.email) || !data.tenant) {
+        let error = new Error("User: user [id | username | email], and tenant information are required.");
         return cb(error, null);
     }
 
@@ -623,7 +697,9 @@ User.prototype.uninvite = function (data, cb) {
                 "config.allowedTenants": {"tenant.id": data.tenant.id}
             }
         };
-        condition.status = data.status;
+        if (data.status) {
+            condition.status = data.status;
+        }
         __self.mongoCore.updateOne(colName, condition, s, null, (err, record) => {
             if (!record || (record && !record.nModified)) {
                 let user = data.user.id || data.user.username || data.user.email;
@@ -637,8 +713,7 @@ User.prototype.uninvite = function (data, cb) {
     if (data.user.username) {
         let condition = {'username': data.user.username};
         doUninvite(condition);
-    }
-    else if (data.user.email) {
+    } else if (data.user.email) {
         let condition = {'email': data.user.email};
         doUninvite(condition);
     } else {
@@ -663,8 +738,8 @@ User.prototype.uninvite = function (data, cb) {
  */
 User.prototype.editGroups = function (data, cb) {
     let __self = this;
-    if (!data || !data.user || !(data.user.id || data.user.username || data.user.email) || !data.status || !data.tenant || !data.groups) {
-        let error = new Error("User: user [id | username | email], status, groups, and tenant information are required.");
+    if (!data || !data.user || !(data.user.id || data.user.username || data.user.email) || !data.tenant || !data.groups) {
+        let error = new Error("User: user [id | username | email], groups, and tenant information are required.");
         return cb(error, null);
     }
 
@@ -677,8 +752,7 @@ User.prototype.editGroups = function (data, cb) {
                 }
             };
             condition["config.allowedTenants.tenant.id"] = data.tenant.id;
-        }
-        else {
+        } else {
             s = {
                 "$set": {
                     "groups": data.groups
@@ -686,22 +760,45 @@ User.prototype.editGroups = function (data, cb) {
             };
             condition["tenant.id"] = data.tenant.id;
         }
-        condition.status = data.status;
+        if (data.status) {
+            condition.status = data.status;
+        }
         __self.mongoCore.updateOne(colName, condition, s, null, (err, record) => {
-            if (!record || (record && !record.nModified)) {
-                let user = data.user.id || data.user.username || data.user.email;
-                let error = new Error("User: Groups of user [" + user + "] was not updated.");
-                return cb(error);
+            let nModified = 0;
+            if (!record) {
+                nModified = 0;
+            } else {
+                nModified = record.nModified || 0;
             }
-            return cb(err, record.nModified);
+            if (!nModified && data.tenant.type === "product") {
+                //try to update the groups in case of roaming
+                s = {
+                    "$set": {
+                        "config.allowedTenants.$.groups": data.groups
+                    }
+                };
+                condition["config.allowedTenants.tenant.id"] = data.tenant.id;
+                condition["tenant.id"] = {"$ne": data.tenant.id};
+                condition.status = data.status;
+                __self.mongoCore.updateOne(colName, condition, s, null, (err, record) => {
+                    let nModified = 0;
+                    if (!record) {
+                        nModified = 0;
+                    } else {
+                        nModified = record.nModified || 0;
+                    }
+                    return cb(err, nModified);
+                });
+            } else {
+                return cb(err, nModified);
+            }
         });
     };
 
     if (data.user.username) {
         let condition = {'username': data.user.username};
         doEdit(condition);
-    }
-    else if (data.user.email) {
+    } else if (data.user.email) {
         let condition = {'email': data.user.email};
         doEdit(condition);
     } else {
@@ -741,8 +838,7 @@ User.prototype.deleteUpdatePin = function (data, cb) {
                 }
             };
             condition["config.allowedTenants.tenant.id"] = data.tenant.id;
-        }
-        else {
+        } else {
             s = {
                 "$unset": {
                     "tenant.pin": 1
@@ -752,12 +848,33 @@ User.prototype.deleteUpdatePin = function (data, cb) {
         }
 
         __self.mongoCore.updateOne(colName, condition, s, null, (err, record) => {
-            if (!record || (record && !record.nModified)) {
-                let user = data.user.id || data.user.username || data.user.email;
-                let error = new Error("User: Pin of user [" + user + "] was not deleted.");
-                return cb(error);
+            let nModified = 0;
+            if (!record) {
+                nModified = 0;
+            } else {
+                nModified = record.nModified || 0;
             }
-            return cb(err, record.nModified);
+            if (!nModified && data.tenant.type === "product") {
+                //try to delete the pin in case of roaming
+                s = {
+                    "$unset": {
+                        "config.allowedTenants.$.tenant.pin": 1
+                    }
+                };
+                condition["config.allowedTenants.tenant.id"] = data.tenant.id;
+                condition["tenant.id"] = {"$ne": data.tenant.id};
+                __self.mongoCore.updateOne(colName, condition, s, null, (err, record) => {
+                    let nModified = 0;
+                    if (!record) {
+                        nModified = 0;
+                    } else {
+                        nModified = record.nModified || 0;
+                    }
+                    return cb(err, nModified);
+                });
+            } else {
+                return cb(err, nModified);
+            }
         });
     };
 
@@ -771,8 +888,7 @@ User.prototype.deleteUpdatePin = function (data, cb) {
                 s.$set["config.allowedTenants.$.tenant.pin.allowed"] = data.pin.allowed;
             }
             condition["config.allowedTenants.tenant.id"] = data.tenant.id;
-        }
-        else {
+        } else {
 
             if (data.pin.code) {
                 s.$set["tenant.pin.code"] = data.pin.code;
@@ -783,12 +899,35 @@ User.prototype.deleteUpdatePin = function (data, cb) {
             condition["tenant.id"] = data.tenant.id;
         }
         __self.mongoCore.updateOne(colName, condition, s, null, (err, record) => {
-            if (!record || (record && !record.nModified)) {
-                let user = data.user.id || data.user.username || data.user.email;
-                let error = new Error("User: Pin of user [" + user + "] was not updated.");
-                return cb(error);
+            let nModified = 0;
+            if (!record) {
+                nModified = 0;
+            } else {
+                nModified = record.nModified || 0;
             }
-            return cb(err, record.nModified);
+            if (!nModified && data.tenant.type === "product") {
+                //try to update the pin in case of roaming
+                let s = {"$set": {}};
+                if (data.pin.code) {
+                    s.$set["config.allowedTenants.$.tenant.pin.code"] = data.pin.code;
+                }
+                if (data.pin.hasOwnProperty("allowed")) {
+                    s.$set["config.allowedTenants.$.tenant.pin.allowed"] = data.pin.allowed;
+                }
+                condition["config.allowedTenants.tenant.id"] = data.tenant.id;
+                condition["tenant.id"] = {"$ne": data.tenant.id};
+                __self.mongoCore.updateOne(colName, condition, s, null, (err, record) => {
+                    let nModified = 0;
+                    if (!record) {
+                        nModified = 0;
+                    } else {
+                        nModified = record.nModified || 0;
+                    }
+                    return cb(err, nModified);
+                });
+            } else {
+                return cb(err, nModified);
+            }
         });
     };
 
@@ -796,8 +935,7 @@ User.prototype.deleteUpdatePin = function (data, cb) {
         condition.status = data.status;
         if (data.pin.delete) {
             doDelete(condition);
-        }
-        else {
+        } else {
             if (!(data.pin.code || data.pin.hasOwnProperty("allowed"))) {
                 let error = new Error("User: pin [code or allowed] is required.");
                 return cb(error, null);
@@ -809,8 +947,7 @@ User.prototype.deleteUpdatePin = function (data, cb) {
     if (data.user.username) {
         let condition = {'username': data.user.username};
         doPin(condition);
-    }
-    else if (data.user.email) {
+    } else if (data.user.email) {
         let condition = {'email': data.user.email};
         doPin(condition);
     } else {
@@ -822,6 +959,37 @@ User.prototype.deleteUpdatePin = function (data, cb) {
             doPin(condition);
         });
     }
+};
+
+User.prototype.delete = function (data, cb) {
+    let __self = this;
+    if (!data || !data.id) {
+        let error = new Error("User: id is required.");
+        return cb(error, null);
+    }
+    __self.validateId(data.id, (err, _id) => {
+        if (err) {
+            return cb(err, null);
+        }
+        let condition = {'_id': _id};
+        __self.mongoCore.findOne(colName, condition, null, (err, record) => {
+            if (err) {
+                return cb(err);
+            }
+            if (!record) {
+                let error = new Error("User: cannot delete record. Not found.");
+                return cb(error, null);
+            }
+            if (record.locked) {
+                //return error msg that this record is locked
+                let error = new Error("User: cannot delete a locked record.");
+                return cb(error, null);
+            }
+            __self.mongoCore.deleteOne(colName, condition, null, (err) => {
+                return cb(err, record);
+            });
+        });
+    });
 };
 
 User.prototype.validateId = function (id, cb) {
@@ -836,16 +1004,25 @@ User.prototype.validateId = function (id, cb) {
         id = __self.mongoCore.ObjectId(id);
         return cb(null, id);
     } catch (e) {
-        __self.log(e);
+        __self.log(e.message);
         return cb(new Error("A valid ID is required"), null);
     }
 };
 
-User.prototype.closeConnection = function () {
+User.prototype.closeConnection = function (count) {
     let __self = this;
-
+    count = count || 1;
     if (!__self.mongoCoreExternal) {
-        __self.mongoCore.closeDb();
+        if (__self.mongoCore) {
+            if (__self.counter >= __self.indexCount || count > indexing._len) {
+                if (!__self.keepConnectionAlive) {
+                    __self.mongoCore.closeDb();
+                }
+            } else {
+                count++;
+                __self.closeConnection(count);
+            }
+        }
     }
 };
 

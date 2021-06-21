@@ -78,7 +78,7 @@ module.exports = function (grunt) {
                 "varstmt": true,
 
                 //"validthis": true,
-                //"loopfunc": true,
+                "loopfunc": true,
                 //"sub": true,
                 //"supernew": true,
 
@@ -94,7 +94,7 @@ module.exports = function (grunt) {
                 }
             },
             files: {
-                src: ['config.js', 'index.js', 'Gruntfile.js', 'bl/*.js', 'bl/lib/*.js', 'lib/*.js', 'model/mongo/*.js', 'test/helper.js', 'test/unit/**/*.js', 'test/integration/**/*.js', 'test/stress/**/*.js']
+                src: ['config.js', 'index.js', '_index.js', 'Gruntfile.js', 'bl/*.js', 'bl/lib/*.js', 'lib/*.js', 'model/mongo/*.js', 'test/helper.js', 'test/unit/**/*.js', 'test/integration/**/*.js', 'test/stress/**/*.js']
             },
             gruntfile: {
                 src: 'Gruntfile.js'
@@ -107,14 +107,18 @@ module.exports = function (grunt) {
                 SOAJS_ENV: 'dashboard',
                 SOAJS_SRVIP: '127.0.0.1',
                 SOAJS_TEST: true,
-                SOAJS_SRVPORT: 4001
+                SOAJS_SRVPORT: 4001,
+                SOAJS_DEPLOY_MANUAL: true,
+                SOAJS_REGISTRY_API: '127.0.0.1:5000'
             },
             coverage: {
                 APP_DIR_FOR_CODE_COVERAGE: '../test/coverage/instrument/',
                 SOAJS_ENV: 'dashboard',
                 SOAJS_SRVIP: '127.0.0.1',
                 SOAJS_TEST: true,
-                SOAJS_SRVPORT: 4001
+                SOAJS_SRVPORT: 4001,
+                SOAJS_DEPLOY_MANUAL: true,
+                SOAJS_REGISTRY_API: '127.0.0.1:5000'
             }
         },
 
@@ -136,7 +140,7 @@ module.exports = function (grunt) {
         },
 
         instrument: {
-            files: ['config.js', 'index.js', 'bl/*.js', 'bl/lib/*.js', 'lib/*.js', 'model/mongo/*.js'],
+            files: ['config.js', 'index.js', '_index.js', 'bl/*.js', 'bl/lib/*.js', 'lib/*.js', 'model/mongo/*.js'],
             options: {
                 lazy: false,
                 basePath: 'test/coverage/instrument/'

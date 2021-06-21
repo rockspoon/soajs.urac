@@ -8,6 +8,8 @@
  * found in the LICENSE file at the root of this repository
  */
 
+const get = (p, o) => p.reduce((xs, x) => (xs && xs[x]) ? xs[x] : null, o);
+
 const colName = "tokens";
 const core = require("soajs");
 const Mongo = core.mongo;
@@ -17,6 +19,7 @@ let indexing = {};
 
 function Token(soajs, localConfig, mongoCore) {
     let __self = this;
+    __self.keepConnectionAlive = false;
     if (mongoCore) {
         __self.mongoCore = mongoCore;
         __self.mongoCoreExternal = true;
@@ -24,30 +27,60 @@ function Token(soajs, localConfig, mongoCore) {
     if (!__self.mongoCore) {
         __self.mongoCoreExternal = false;
         let tCode = soajs.tenant.code;
-        if (soajs.tenant.type === "client" && soajs.tenant.main) {
+        if (soajs.tenant.main && soajs.tenant.main.code) {
             tCode = soajs.tenant.main.code;
         }
+        let masterCode = get(["registry", "custom", "urac", "value", "masterCode"], soajs);
+        if (masterCode) {
+            tCode = masterCode;
+        } else {
+            let dbCodes = get(["registry", "custom", "urac", "value", "dbCodes"], soajs);
+            if (dbCodes) {
+                for (let c in dbCodes) {
+                    if (dbCodes.hasOwnProperty(c)) {
+                        if (dbCodes[c].includes(tCode)) {
+                            tCode = c;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         __self.mongoCore = new Mongo(soajs.meta.tenantDB(soajs.registry.tenantMetaDB, localConfig.serviceName, tCode));
-    }
-    if (indexing && soajs && soajs.tenant && soajs.tenant.id && !indexing[soajs.tenant.id]) {
-        indexing[soajs.tenant.id] = true;
 
-        __self.mongoCore.createIndex(colName, {
-            'userId': 1,
-            'service': 1,
-            'status': 1
-        }, {unique: true}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
-        __self.mongoCore.createIndex(colName, {
-            'token': 1,
-            'service': 1,
-            'status': 1
-        }, {unique: true}, (err, index) => {
-            soajs.log.debug("Index: " + index + " created with error: " + err);
-        });
+        __self.indexCount = 0;
+        __self.counter = 0;
+        if (indexing && tCode && !indexing[tCode]) {
+            indexing[tCode] = true;
 
-        soajs.log.debug("Token: Indexes for " + soajs.tenant.id + " Updated!");
+            let indexes = [
+                {
+                    "col": colName, "i": {
+                        'userId': 1,
+                        'service': 1,
+                        'status': 1
+                    }, "o": {unique: true}
+                },
+                {
+                    "col": colName, "i": {
+                        'token': 1,
+                        'service': 1,
+                        'status': 1
+                    }, "o": {unique: true}
+                }
+            ];
+            __self.indexCount = indexes.length;
+            indexing._len = indexes.length;
+
+            for (let i = 0; i < indexes.length; i++) {
+                __self.mongoCore.createIndex(indexes[i].col, indexes[i].i, indexes[i].o, (err, index) => {
+                    soajs.log.debug("Index: " + index + " created with error: " + err);
+                    __self.counter++;
+                });
+            }
+
+            soajs.log.debug("Token: Indexes for " + tCode + " Updated!");
+        }
     }
 }
 
@@ -70,12 +103,22 @@ Token.prototype.updateStatus = function (data, cb) {
         'safe': true
     };
 
-    __self.mongoCore.update(colName, condition, s, extraOptions, (err, record) => {
+    __self.mongoCore.updateOne(colName, condition, s, extraOptions, (err, record) => {
+        if (!record || (record && !record.nModified)) {
+            let error = new Error("Token: status for token [" + data.token + "] was not update.");
+            return cb(error);
+        }
+        return cb(err, record.nModified);
+        /*
+        { n: 0, nModified: 0, ok: 1 }
+         */
+        /*
         if (!record) {
             let error = new Error("Token: status for token [" + data.token + "] was not update.");
             return cb(error);
         }
         return cb(err, record);
+        */
     });
 };
 
@@ -111,12 +154,25 @@ Token.prototype.add = function (data, cb) {
         'upsert': true,
         'safe': true
     };
-    __self.mongoCore.update(colName, condition, s, extraOptions, (err, record) => {
+    __self.mongoCore.updateOne(colName, condition, s, extraOptions, (err, record) => {
+        if (!record || (record && !(record.nModified || record.upsertedCount))) {
+            let error = new Error("Token: token for [" + data.service + "] was not created.");
+            return cb(error);
+        }
+        return cb(err, {'token': token, 'ttl': data.tokenExpiryTTL});
+        /*
+        { n: 1,
+          nModified: 0,
+          upserted: [ { index: 0, _id: 5ea87612833ccbfae71675f3 } ],
+          ok: 1 }
+         */
+        /*
         if (!record) {
             let error = new Error("Token: token for [" + data.service + "] was not created.");
             return cb(error);
         }
         return cb(err, {'token': token, 'ttl': data.tokenExpiryTTL});
+        */
     });
 };
 
@@ -152,11 +208,20 @@ Token.prototype.list = function (data, cb) {
     });
 };
 
-Token.prototype.closeConnection = function () {
+Token.prototype.closeConnection = function (count) {
     let __self = this;
-
+    count = count || 1;
     if (!__self.mongoCoreExternal) {
-        __self.mongoCore.closeDb();
+        if (__self.mongoCore) {
+            if (__self.counter >= __self.indexCount || count > indexing._len) {
+                if (!__self.keepConnectionAlive) {
+                    __self.mongoCore.closeDb();
+                }
+            } else {
+                count++;
+                __self.closeConnection(count);
+            }
+        }
     }
 };
 

@@ -11,6 +11,8 @@
 const async = require("async");
 const fs = require("fs");
 
+const get = (p, o) => p.reduce((xs, x) => (xs && xs[x]) ? xs[x] : null, o);
+
 const lib = {
     "mail": require("../lib/mail.js"),
     "pwd": require("../lib/pwd.js")
@@ -28,26 +30,46 @@ let bl = {
     token: null,
 
     "sendCustomEmail": (soajs, inputmaskData, options, cb) => {
+
+        let sendEmail = (data, what) => {
+            lib.mail.send(soajs, what, data, null, function (error, mailRecord) {
+                if (error) {
+                    soajs.log.info(what + ': No Mail was sent: ' + error.message);
+                }
+                return cb(null, mailRecord);
+            });
+        };
+
+        let what = inputmaskData.what;
         let data = {};
         if (inputmaskData.data) {
             data = inputmaskData.data;
         }
-        data.email = inputmaskData.email;
-        let what = inputmaskData.what;
-        lib.mail.send(soajs, what, data, null, function (error, mailRecord) {
-            if (error) {
-                soajs.log.info(what + ': No Mail was sent: ' + error);
-            }
-            return cb(null, mailRecord);
-        });
+        if (inputmaskData.email) {
+            data.email = inputmaskData.email;
+            sendEmail(data, what);
+        } else if (inputmaskData.id) {
+            let d = {
+                "id": inputmaskData.id,
+                "ignoreStatus": true
+            };
+            bl.user.getUser(soajs, d, null, (error, record) => {
+                if (error) {
+                    soajs.log.info(what + ': No Mail was sent: ' + error.message);
+                }
+                data.email = record.email;
+                sendEmail(data, what);
+            });
+        } else {
+            soajs.log.info(what + ': No Mail was sent, unable to find the TO email address.');
+        }
     },
 
     "deleteGroup": (soajs, inputmaskData, options, cb) => {
         bl.group.deleteGroup(soajs, inputmaskData, null, (error, record) => {
             if (error) {
                 return cb(error, null);
-            }
-            else {
+            } else {
                 //close response but continue to clean up deleted group from users
                 cb(null, true);
                 let data = {};
@@ -244,7 +266,7 @@ let bl = {
                     userRecord.email = inputmaskData.email;
                     lib.mail.send(soajs, "changeEmail", userRecord, tokenRecord, function (error, mailRecord) {
                         if (error) {
-                            soajs.log.info('changeEmail: No Mail was sent: ' + error);
+                            soajs.log.info('changeEmail: No Mail was sent: ' + error.message);
                         }
                         return cb(null, {
                             token: tokenRecord.token,
@@ -273,7 +295,24 @@ let bl = {
                 bl.user.mt.closeModel(modelObj);
                 return cb(error, null);
             }
-            lib.pwd.compare(soajs.servicesConfig, inputmaskData.oldPassword, userRecord.password, bl.user.localConfig, (error, response) => {
+            let encryptionConfig = {};
+            if (soajs.servicesConfig && soajs.servicesConfig.hashIterations) {
+                encryptionConfig.hashIterations = soajs.servicesConfig.hashIterations;
+            } else {
+                let hashIterations = get(["registry", "custom", "urac", "value", "hashIterations"], soajs);
+                if (hashIterations) {
+                    encryptionConfig.hashIterations = hashIterations;
+                }
+            }
+            if (soajs.servicesConfig && soajs.servicesConfig.optionalAlgorithm) {
+                encryptionConfig.optionalAlgorithm = soajs.servicesConfig.optionalAlgorithm;
+            } else {
+                let optionalAlgorithm = get(["registry", "custom", "urac", "value", "optionalAlgorithm"], soajs);
+                if (optionalAlgorithm) {
+                    encryptionConfig.optionalAlgorithm = optionalAlgorithm;
+                }
+            }
+            lib.pwd.compare(encryptionConfig, inputmaskData.oldPassword, userRecord.password, bl.user.localConfig, (error, response) => {
                 if (error || !response) {
                     //close model
                     bl.user.mt.closeModel(modelObj);
@@ -318,7 +357,7 @@ let bl = {
                 }
                 lib.mail.send(soajs, "forgotPassword", userRecord, tokenRecord, function (error, mailRecord) {
                     if (error) {
-                        soajs.log.info('forgotPassword: No Mail was sent: ' + error);
+                        soajs.log.info('forgotPassword: No Mail was sent: ' + error.message);
                     }
                     return cb(null, {
                         token: tokenRecord.token,
@@ -337,8 +376,7 @@ let bl = {
                 }
                 return cb(null, {'users': [], 'groups': groupRecords});
             });
-        }
-        else {
+        } else {
             //TODO: better to make this async
             //As main tenant both users and groups share the same DB connection
             let modelObj = bl.user.mt.getModel(soajs);
@@ -375,13 +413,13 @@ let bl = {
             inputmaskData._id = userRecord._id;
 
             let doEdit = () => {
-                bl.user.edit(soajs, inputmaskData, options, (error) => {
+                bl.user.edit(soajs, inputmaskData, options, (error, result) => {
                     //close model
                     bl.user.mt.closeModel(modelObj);
                     if (error) {
                         return cb(error, null);
                     }
-                    return cb(null, true);
+                    return cb(null, !!result);
                 });
             };
             if (inputmaskData.email) {
@@ -401,8 +439,7 @@ let bl = {
                     }
                     doEdit();
                 });
-            }
-            else {
+            } else {
                 doEdit();
             }
         });
@@ -431,9 +468,11 @@ function init(service, localConfig, cb) {
 
         bl.addUser = require("./lib/addUser.js")(bl);
         bl.join = require("./lib/join.js")(bl);
+        bl.selfInvite = require("./lib/selfInvite.js")(bl);
         bl.inviteUsers = require("./lib/inviteUsers.js")(bl);
         bl.uninviteUsers = require("./lib/uninviteUsers.js")(bl);
         bl.editPin = require("./lib/editPin.js")(bl);
+        bl.emailToken = require("./lib/emailToken.js")(bl);
 
         if (err) {
             service.log.error(`Requested model not found. make sure you have a model for ${err.name} @ ${err.model}`);

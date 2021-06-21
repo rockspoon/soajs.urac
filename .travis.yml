@@ -1,6 +1,6 @@
 language: node_js
 
-node_js: 10
+node_js: 12
 
 jobs:
   include:
@@ -46,7 +46,7 @@ jobs:
     - git config --local user.email ${GIT_EMAIL}
     - git tag ${PACKAGE_VERSION}
 
-    - docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
     - docker build -t soajsorg/urac .
 
